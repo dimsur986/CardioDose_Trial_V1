@@ -61,6 +61,9 @@ ul{margin:0;padding-left:11px}
 .acts .p{flex:1;background:var(--yel);color:var(--navy);border:2px solid var(--navy)}
 .acts .r{background:#fff;color:var(--navy);border:1.5px solid #b8c4dd}
 .note{font-size:11.5px;margin-top:10px}
+.app input::placeholder{color:#8a96b5;font-weight:500}
+.app .fe{font-size:11.5px;font-weight:600;color:#8a1c1c}.app .fe:empty{display:none}
+.app input[aria-invalid="true"]{border-color:#c0392b}
 @page{size:A4 portrait;margin:6mm}
 @media print{
  .app{display:none}
@@ -80,8 +83,9 @@ ul{margin:0;padding-left:11px}
 <body>
 <div class="app">
  <div class="top"><img id="formLogo" alt="Logo RS Universitas Airlangga"><h1>Perhitungan Dosis Obat<br>Instalasi Anestesi</h1></div>
- <p class="lead">Isi identitas, berat badan, tinggi badan, dan tanggal operasi, lalu cetak. Tabel dosis dihitung otomatis dan hanya muncul pada lembar cetak.</p>
+ <p class="lead">Isi identitas (termasuk No. RM), berat badan, tinggi badan, dan tanggal operasi, lalu cetak. Tabel dosis dihitung otomatis dan hanya muncul pada lembar cetak.</p>
  <section class="card"><h2>Identitas pasien (ikut tercetak)</h2><div class="g">
+  <label class="w">Nomor Rekam Medis (No. RM)<input id="rm" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="Masukkan nomor rekam medis" aria-describedby="rmErr"><span class="fe" id="rmErr" role="alert"></span></label>
   <label class="w">Nama<input id="nama" autocomplete="off"></label>
   <label>Umur<div class="agef"><input id="umur" type="number" inputmode="decimal" min="0" step="any"><select id="umurSatuan" aria-label="Satuan umur"><option value="hari">hari</option><option value="bulan">bulan</option><option value="tahun" selected>tahun</option></select></div></label>
   <label>Operasi (Op)<input id="op"></label>
@@ -109,12 +113,13 @@ ul{margin:0;padding-left:11px}
  </div>
 
  <div class="pt">
-  <label class="s2">Nama<span class="v" id="p_nama"></span></label>
+  <label class="s2">No. RM<span class="v" id="p_rm"></span></label>
+  <label class="s3">Nama<span class="v" id="p_nama"></span></label>
   <label>Umur<span class="v" id="p_umur"></span></label>
   <label>BB<span class="v" id="p_bb"></span> kg</label>
   <label>TB<span class="v" id="p_tb"></span> cm</label>
-  <label class="s4">Dx<span class="v" id="p_dx"></span></label>
   <label>BSA<output id="bsa">–</output>&nbsp;m²</label>
+  <label class="s5">Dx<span class="v" id="p_dx"></span></label>
   <label class="s3">Op<span class="v" id="p_op"></span></label>
   <label class="s2">OK<span class="v" id="p_ok"></span></label>
   <label class="s5">Siap darah<span class="v" id="p_darah"></span></label>
@@ -169,7 +174,24 @@ ul{margin:0;padding-left:11px}
 "use strict";
 const $=id=>document.getElementById(id);
 const rg=(a,b,s)=>{const r=[];for(let x=a;x<=b+1e-9;x+=s)r.push(+x.toFixed(4));return r;};
-const f=(n,d=3)=>Number.isFinite(n)?(+n.toFixed(d)).toLocaleString("id-ID",{minimumFractionDigits:Math.min(2,d),maximumFractionDigits:d}):"–";
+/* ===== FORMAT ANGKA TERPUSAT (khusus TAMPILAN) =====
+   Nilai internal tetap presisi penuh; fungsi ini hanya mengembalikan teks, tidak mengubah angka asli.
+   Seperti format angka Excel: jumlah desimal TETAP (12 -> "12,00"), pembulatan half-away-from-zero
+   dari 15 digit signifikan (1,005 -> "1,01"; toFixed() akan salah -> "1,00"). Locale Indonesia: desimal koma, ribuan titik.
+   Nilai kosong/tidak valid (null, undefined, "", NaN, Infinity) -> fallback "–", tidak pernah "NaN"/"Infinity". */
+const NF={};
+function formatNumber(value,decimalPlaces=2,fallback="–"){
+  let n=value;
+  if(typeof n==="string"){n=n.trim();n=n===""?NaN:Number(n.replace(",","."));}
+  else if(typeof n!=="number")return fallback;
+  if(!Number.isFinite(n))return fallback;
+  const d=Number.isInteger(decimalPlaces)?Math.min(20,Math.max(0,decimalPlaces)):2;
+  n=Number(n.toPrecision(15));if(n===0)n=0;
+  const nf=NF[d]||(NF[d]=new Intl.NumberFormat("id-ID",{minimumFractionDigits:d,maximumFractionDigits:d}));
+  return nf.format(n);
+}
+/* Jumlah desimal per jenis output (sama dengan presisi yang sudah dipakai aplikasi; samakan dengan format sel Excel sumber bila berbeda). */
+const DEC={bsa:2,kartu:3,precedex:3,milLoad:2,hepU:0,hepCc:2,prot:0,txMg:0,txRate:2,txMgH:0,txRateH:2};
 const fd=x=>String(x).replace(".",",");
 const NE=[10,25,50,75,100,125,150,175,200,250];
 const CARDS=[
@@ -184,27 +206,31 @@ const CARDS=[
  ["r2","Adrenalin 0,05 mg/cc","nano",rg(10,100,10),(d,w)=>d*60*w/50000],
  ["r2","Adrenalin 0,0125 mg/cc","nano",rg(10,100,10),(d,w)=>d*60*w/12500]
 ];
-const tbl=(u,rows)=>`<table><tr><th>${u}</th><th>cc/jam</th></tr>${rows.map(([a,b])=>`<tr><td>${fd(a)}</td><td>${f(b)}</td></tr>`).join("")}</table>`;
+const tbl=(u,rows)=>`<table><tr><th>${u}</th><th>cc/jam</th></tr>${rows.map(([a,b])=>`<tr><td>${fd(a)}</td><td>${formatNumber(b,DEC.kartu)}</td></tr>`).join("")}</table>`;
 function calc(){
  const w=parseFloat($("bb").value)||0,h=parseFloat($("tb").value)||0,ok=w>0;
- $("bsa").textContent=(w&&h)?f(Math.round(Math.sqrt(w*h/3600)*100)/100,2):"–";
+ $("bsa").textContent=(w&&h)?formatNumber(Math.sqrt(w*h/3600),DEC.bsa):"–";
  ["r1","r2"].forEach(r=>$(r).innerHTML="");
  CARDS.forEach(([r,t,u,ds,fn])=>{
   $(r).insertAdjacentHTML("beforeend",`<div class="box"><h4>${t}</h4>${tbl(u,ds.map(d=>[d,ok?fn(d,w):NaN]))}</div>`);
  });
- const set=(id,v,d)=>$(id).textContent=ok?f(v,d):"–";
- set("milLoad",w*50*6/200,2);
- set("hepU",4*w*100,0);set("hepCc",4*w*100/1000,2);set("prot",4*w*100/100,0);
+ const set=(id,v)=>$(id).textContent=ok?formatNumber(v,DEC[id]):"–";
+ set("milLoad",w*50*6/200);
+ set("hepU",4*w*100);set("hepCc",4*w*100/1000);set("prot",4*w*100/100);
  const tx=50*w;
- set("txMg",tx,0);set("txRate",tx/100*2,2);
- set("txMgH",tx/4,0);set("txRateH",tx/4/100,2);
- $("prec").innerHTML=`<tr><th>dosis</th><th>cc/jam</th></tr>`+rg(.1,.7,.1).map(d=>`<tr><td>${fd(d)}</td><td>${ok?f(w*d/4,3):"–"}</td></tr>`).join("");
+ set("txMg",tx);set("txRate",tx/100*2);
+ set("txMgH",tx/4);set("txRateH",tx/4/100);
+ $("prec").innerHTML=`<tr><th>dosis</th><th>cc/jam</th></tr>`+rg(.1,.7,.1).map(d=>`<tr><td>${fd(d)}</td><td>${ok?formatNumber(w*d/4,DEC.precedex):"–"}</td></tr>`).join("");
 }
 const bga=["Jam","pH","pCO₂","pO₂","HCO₃","BE","SaO₂","Na","K","iCa","Hct","Hb"];
 ["b1","b2"].forEach(id=>$(id).innerHTML=bga.map(x=>`<tr><td>${x}</td><td></td></tr>`).join(""));
-const MAP=["nama","umur","op","dx","ok","darah","tgl","bb","tb"];
+const MAP=["rm","nama","umur","op","dx","ok","darah","tgl","bb","tb"];
 const dmy=v=>v?v.split("-").reverse().join("/"):"";
-function sync(){MAP.forEach(k=>{const e=$("p_"+k);if(e)e.textContent=k==="tgl"?dmy($(k).value):$(k).value;});$("bsaPrev").textContent=$("bsa").textContent;}
+/* No. RM: diperlakukan sebagai TEKS apa adanya (nol di depan & huruf dipertahankan, tidak pernah jadi angka).
+   Hanya hidup di field & lembar cetak: tidak masuk URL, storage, QR, atau log. */
+const rmClean=v=>String(v).trim();
+function rmCheck(){const e=$("rm"),bad=e.value.length>0&&rmClean(e.value)==="";e.setAttribute("aria-invalid",bad);$("rmErr").textContent=bad?"No. RM tidak boleh hanya berisi spasi.":"";}
+function sync(){MAP.forEach(k=>{const e=$("p_"+k);if(e)e.textContent=k==="tgl"?dmy($(k).value):k==="rm"?rmClean($(k).value):(k==="bb"||k==="tb")?fd($(k).value):$(k).value;});$("bsaPrev").textContent=$("bsa").textContent;}
 /* Rentang BB wajar (kg) per kategori usia: hanya untuk peringatan input.
    Angka ini asumsi umum, sesuaikan dengan protokol RS Anda. */
 const RENTANG_BB={Neonatus:[0.5,6],Bayi:[2.5,12],Anak:[6,75],Remaja:[25,150],Dewasa:[30,250]};
@@ -221,9 +247,10 @@ function usia(){
  if(w>0){const [lo,hi]=RENTANG_BB[kat];if(w<lo||w>hi)msg.push(kat+" dengan BB "+fd(w)+" kg, periksa kembali input (rentang yang dipakai: "+fd(lo)+"–"+fd(hi)+" kg).");}
  wr.textContent=msg.join(" ");wr.classList.toggle("on",msg.length>0);
 }
-function all(){calc();sync();usia();}
+function all(){calc();sync();usia();rmCheck();}
 MAP.forEach(k=>$(k).addEventListener("input",all));
 $("umurSatuan").addEventListener("change",all);
+$("rm").addEventListener("blur",()=>{$("rm").value=rmClean($("rm").value);all();});
 $("formLogo").src=document.querySelector(".logo img").src;
 $("resetBtn").addEventListener("click",()=>{MAP.forEach(k=>$(k).value="");$("umurSatuan").value="tahun";all();});
 function fit(){

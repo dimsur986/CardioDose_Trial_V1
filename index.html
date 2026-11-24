@@ -101,7 +101,7 @@ ul{margin:0;padding-left:11px}
   <div class="kat" id="kat"></div>
   <div class="warn" id="warn" role="alert"></div>
  </div></section>
- <div class="acts"><button class="p" onclick="window.print()">Cetak lembar dosis (A4)</button><button class="r" id="resetBtn">Kosongkan</button></div>
+ <div class="acts"><button class="p" onclick="setJudulCetak();window.print()">Cetak lembar dosis (A4)</button><button class="r" id="resetBtn">Kosongkan</button></div>
  <p class="note">Pada dialog cetak: A4, portrait, skala 100%, aktifkan "Background graphics".</p>
 </div>
 
@@ -261,8 +261,18 @@ function fit(){
  sh.setAttribute("style",st);
  if(mm>max) sh.style.zoom=(max/mm).toFixed(3);
 }
-window.addEventListener("beforeprint",fit);
-window.addEventListener("afterprint",()=>document.querySelector(".sheet").style.zoom=1);
+/* Judul dokumen saat cetak/simpan PDF: "Lembar Perhitungan Dosis Obat <Nama> / <No. RM> – Instalasi Anestesi | RS Universitas Airlangga".
+   Judul ini jadi nama file default saat "Simpan sebagai PDF". Nama & No. RM hanya dipasang SELAMA proses cetak,
+   lalu judul dikembalikan ke semula (identitas pasien tidak tertinggal di judul tab/riwayat browser). */
+const JUDUL_AWAL=document.title;
+const bersih=v=>String(v||"").replace(/[\u0000-\u001f]/g," ").replace(/\s+/g," ").trim();
+function setJudulCetak(){
+ const nama=bersih($("nama").value),rm=bersih(rmClean($("rm").value));
+ const ident=[nama,rm].filter(Boolean).join(" / ");
+ document.title=ident?"Lembar Perhitungan Dosis Obat "+ident+" – Instalasi Anestesi | RS Universitas Airlangga":JUDUL_AWAL;
+}
+window.addEventListener("beforeprint",()=>{setJudulCetak();fit();});
+window.addEventListener("afterprint",()=>{document.querySelector(".sheet").style.zoom=1;document.title=JUDUL_AWAL;});
 all();
 </script>
 </body>

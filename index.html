@@ -74,10 +74,18 @@ ul{margin:0;padding-left:11px}
 <body>
 <div class="app">
  <div class="top"><img id="formLogo" alt="Logo RS Universitas Airlangga"><h1>Perhitungan Dosis Obat<br>Instalasi Anestesi</h1></div>
- <p class="lead">Isi berat badan, tinggi badan, dan tanggal operasi, lalu cetak. Tabel dosis dihitung otomatis dan hanya muncul pada lembar cetak. Nama, umur, Dx, Op, OK, dan Siap darah ditulis tangan pada lembar cetak.</p>
+ <p class="lead">Isi identitas, berat badan, tinggi badan, dan tanggal operasi, lalu cetak. Tabel dosis dihitung otomatis dan hanya muncul pada lembar cetak.</p>
+ <section class="card"><h2>Identitas pasien (ikut tercetak)</h2><div class="g">
+  <label class="w">Nama<input id="nama" autocomplete="off"></label>
+  <label>Umur (tahun)<input id="umur" inputmode="numeric"></label>
+  <label>Operasi (Op)<input id="op"></label>
+  <label class="w">Diagnosis (Dx)<input id="dx"></label>
+  <label>OK<input id="ok"></label>
+  <label>Siap darah<input id="darah"></label>
+ </div></section>
  <section class="card"><div class="g">
-  <label class="key">Berat badan (kg)<input id="bb" type="number" inputmode="decimal" step="0.1" min="0" placeholder="Contoh: 70"></label>
-  <label class="key">Tinggi badan (cm)<input id="tb" type="number" inputmode="decimal" step="0.1" min="0" placeholder="Contoh: 167"></label>
+  <label class="key">Berat badan (kg)<input id="bb" type="number" inputmode="decimal" step="0.1" min="0"></label>
+  <label class="key">Tinggi badan (cm)<input id="tb" type="number" inputmode="decimal" step="0.1" min="0"></label>
   <label class="w">Tanggal operasi<input id="tgl" type="date"></label>
   <div class="bsaPrev">BSA: <b id="bsaPrev">–</b> m²</div>
  </div></section>
@@ -186,7 +194,7 @@ function calc(){
 }
 const bga=["Jam","pH","pCO₂","pO₂","HCO₃","BE","SaO₂","Na","K","iCa","Hct","Hb"];
 ["b1","b2"].forEach(id=>$(id).innerHTML=bga.map(x=>`<tr><td>${x}</td><td></td></tr>`).join(""));
-const MAP=["tgl","bb","tb"];
+const MAP=["nama","umur","op","dx","ok","darah","tgl","bb","tb"];
 const dmy=v=>v?v.split("-").reverse().join("/"):"";
 function sync(){MAP.forEach(k=>{const e=$("p_"+k);if(e)e.textContent=k==="tgl"?dmy($(k).value):$(k).value;});$("bsaPrev").textContent=$("bsa").textContent;}
 function all(){calc();sync();}
